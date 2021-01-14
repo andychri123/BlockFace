@@ -1,6 +1,6 @@
 # crypto-socia-net
 
-Censorship resistant social network
+<b>Censorship resistant social network</b>
 
 
 smart contract that runs on the ethereum blockchain
@@ -26,7 +26,7 @@ Adding or removing of a moderator by members
 moderators have the ability to remove a post if it is either porn or gore
 
 
-future features:
+<b>future features:</b>
 
 Members can dispute a post removal if they feel it was removed by a mod illegitimately 
 
