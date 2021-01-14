@@ -7,7 +7,7 @@ smart contract that runs on the ethereum blockchain
 future implementations will run on another blockchain that will support free and private block transactions
 
 
-Current features:
+<b>Current features:</b>
 
 Sign up
 
