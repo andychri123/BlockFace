@@ -1,7 +1,8 @@
 # crypto-socia-net
 
-Censorship resistant
-A smart contract that runs on the ethereum blockchain
+Censorship resistant social network
+
+smart contract that runs on the ethereum blockchain
 future implementations will run on another blockchain that will support free and private block transactions
 
 Current features:
