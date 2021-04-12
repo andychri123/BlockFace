@@ -1,4 +1,4 @@
-# crypto-socia-net
+# BlockFace
 
 <b>Censorship resistant social network</b>
 
