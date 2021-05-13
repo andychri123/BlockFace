@@ -217,6 +217,16 @@ contract Incidents {
         return (name, description, location, add);
     }
 
+    function usersProfile(address user)public view returns (string memory name, string memory description,
+                                                            string memory location, address add){
+        string memory name = profiles[user].name;
+        string memory description = profiles[user].description;
+        string memory location = profiles[user].location;
+        address add = user;
+        return (name, description, location, add);
+    }
+
+
     //    function respond(uint _incidentID)public payable{}
 
     //----------------------------------------------------------------------------------------------------------

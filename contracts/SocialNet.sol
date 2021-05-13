@@ -1,6 +1,5 @@
 pragma solidity 0.5.0;
-import "./SafeMath.sol";
-import "./Message.sol";
+pragma experimental ABIEncoderV2;
 
 //           ___                                                                  _
 //          /__/|__                                                            __//|
@@ -24,6 +23,9 @@ contract SocialNet {
         address publisher;
         string message;
         uint date;
+        uint likeCount;
+        uint dislikeCount;
+        string[] replies;
         mapping(address => bool) likes;
         mapping(address => bool) dislikes;
 // ipfs hash
@@ -31,30 +33,28 @@ contract SocialNet {
         uint flags;
         uint postNo;
         uint[] posts;
-        uint score;
     }
 
     struct Profile {
+        address add;
+        uint ID;
         string location;
         string name;
         string description;
-//        uint likesCounter;
-//        uint dislikesCounter;
         bool status;
         uint postsCounter;
         uint[] posts;
         address[] friends;
-        mapping(address => bool) pendingRequests;
+        address[] friendRequests;
+//        mapping(address => bool) pendingRequests;
         mapping(address => bool) friendss;
         mapping(address => bool) blocked;
-        mapping(address => Message) messages;
-        mapping(address => bytes32) pinned;
 // ipfs hash
         string avatar;
         bool mod;
-// address of identity registry contract
-        address accessRegistry;
-        address messageContract;
+
+        string sessionID;
+        string sessionQR;
     }
 
     struct Message {
@@ -72,14 +72,31 @@ contract SocialNet {
         uint downVotes;
     }
 
+    struct Page{
+        uint ID;
+        string name;
+        string description;
+        address creator;
+        uint[] posts;
+        mapping(address => bool) moderators;
+    }
+
     uint postCount;
+    uint pageCount;
+    uint profilesCount;
 // ImageRegistryOracle is a IPFS address -- pass in a hash of
 // a image the oracle decodes hash and runs it through binwalk using Pyodide
 // -- if it passes.. add to the users ipfs node and add to the merkle tree in the smart contract
     address IPFSRegistryOracle;
+    address AndyChris;
     string TORhiddenServiceOracleAddress;
-    address[] ipfsPins;
+    string xmrAddress;
+    string btcAddress;
+    string ipfsAddress;
+    mapping(uint => address) profiless;
+    mapping(address => bool) moderators;
     mapping(uint => Post) posts;
+    mapping(uint => Page) pages;
     mapping(address => Profile) public profiles;
     mapping(address => ModApp) public modApps;
 // address -- post index -- reason for removal -- true == resolved
@@ -91,13 +108,17 @@ contract SocialNet {
     event PostTipped(uint id, string content, uint tipAmount, address payable author);
 
     constructor () public {
-        owner = msg.sender;
+        AndyChris = msg.sender;
+        xmrAddress = '0xBE52e6782318A5068C8b33e4d93406D3f6cd16DA';
+        btcAddress = '0xBE52e6782318A5068C8b33e4d93406D3f6cd16DA';
+        ipfsAddress = '0xBE52e6782318A5068C8b33e4d93406D3f6cd16DA';
     }
 
-    modifier onlyOwner {
-        require(msg.sender == owner);
+    modifier isAndyChris() {
+        require(msg.sender == AndyChris);
         _;
     }
+
 
     modifier onlyRegistered {
         require(profiles[msg.sender].status);
@@ -115,12 +136,12 @@ contract SocialNet {
     }
 
 
-    modifier notLikedYet (address _friendsAccount, uint numberPost) {
+    modifier notLikedYet (uint numberPost) {
         require(posts[numberPost].likes[msg.sender] == false);
         _;
     }
 
-    modifier notDislikedYet (address _friendsAccount, uint numberPost) {
+    modifier notDislikedYet (uint numberPost) {
         require(posts[numberPost].dislikes[msg.sender] == false);
         _;
     }
@@ -129,35 +150,109 @@ contract SocialNet {
         return postCount;
     }
 
-    function getPost(uint256 id) public view returns ( address publisher, uint postNo, uint date, 
-                                                       string memory message, string memory image){
-        address publisher = posts[id].publisher;
-        uint postNo = posts[id].postNo;
-        uint date = posts[id].date;
-        string memory message = posts[id].message;
-        string memory image = posts[id].image;
-        return (publisher, postNo, date, message, image);
+    function getProfilesAmount() public view returns (uint256) {
+        return profilesCount;
+    }
+
+    function getMyPosts() public view returns (uint[] memory pos){
+        uint[] memory pos = profiles[msg.sender].posts;
+        return (pos);
+    }
+
+    function getUsersPosts(address user) public view returns (uint[] memory pos){
+        uint[] memory pos = profiles[user].posts;
+        return (pos);
+    }
+
+    function getMyPostno() public view returns (uint posNo){
+        uint posNo = profiles[msg.sender].postsCounter;
+        return (posNo);
+    }
+    
+    function setXmrAddress(string memory xmr) public isAndyChris(){
+        xmrAddress = xmr;
+    }
+
+    function setbtcAddress(string memory btc) public isAndyChris(){
+        btcAddress = btc;
+    }
+
+   function setIPFSAddress(string memory ipfs) public isAndyChris(){
+        ipfsAddress = ipfs;
     }
 
 
-    function createAccount (string memory _location, string memory _name, string memory  _description) 
+    function getHomeData() public view returns (string memory xmr, string memory btc, 
+                                                          string memory ipfs){
+        string memory xmr = xmrAddress;
+        string memory btc = btcAddress;
+        string memory ipfs = ipfsAddress;
+        return (xmr, btc, ipfs);
+    }
+
+    function getPost(uint256 id) public view returns ( address publisher, uint postsCounter, 
+                                                       string memory message, string memory image, 
+                                                       string[] memory replies, uint likes){
+        address publisher = posts[id].publisher;
+        uint postsCounter = posts[id].postNo;
+        string memory message = posts[id].message;
+        string memory image = posts[id].image;
+        string[] memory replies = posts[id].replies;
+        uint likes = posts[id].likeCount;
+        return (publisher, postsCounter, message, image, replies, likes);
+    }
+
+    function reply(uint256 id, string memory reply) public payable{
+       // posts[id].replies.push(reply);
+        string memory _reply = string(abi.encodePacked('-->', profiles[msg.sender].name, ": ", reply));
+        posts[id].replies.push(_reply);
+    }
+
+
+    function createAccount (string memory _location, string memory _name, string memory  _description,
+                            string memory _avatar) 
                             public payable {
         bool status = profiles[msg.sender].status;
         if (status) // if profile exists...
             revert();
+        uint ID = profilesCount++;
+        profiles[msg.sender].ID = ID;
+        profiles[msg.sender].add = msg.sender;
         profiles[msg.sender].status = true;
         profiles[msg.sender].name = _name;
         profiles[msg.sender].location = _location;
         profiles[msg.sender].description = _description;
+        profiless[ID] = msg.sender;
         }
 
-    function getAccountCard (address member) public view returns(string memory , uint , uint,
-                             string memory){
-        string memory name = profiles[msg.sender].name;
-        string memory avatar = profiles[msg.sender].avatar;
-        uint followers = profiles[msg.sender].friends.length;
-        uint pCount = profiles[msg.sender].postsCounter;
-        return (name, followers, pCount, avatar);
+    function createPage (string memory _name, string memory _description) public payable {
+        uint pCount = pageCount++;
+        pages[pCount].ID = pCount;
+        pages[pCount].name = _name;
+        pages[pCount].creator = msg.sender;
+        pages[pCount].description = _description;
+        pages[pCount].moderators[msg.sender] = true;
+        profiless[profilesCount++] = msg.sender;
+        }
+
+    function getPage (uint id) public view returns(string memory name, string memory description,
+                                                   address creator, uint[] memory pos){
+        string memory name = pages[id].name;
+        address creator = pages[id].creator;
+        string memory description = pages[id].description;
+        uint[] memory pos = pages[id].posts;
+        return(name, description, creator, pos);
+        }
+
+
+    function getAccountCard (uint member) public view returns(string memory name, uint followers,
+                             uint pCount, address add){
+        string memory name = profiles[profiless[member]].name;
+//        string memory avatar = profiles[profiless[member]].avatar;
+        uint followers = profiles[profiless[member]].friends.length;
+        uint pCount = profiles[profiless[member]].postsCounter;
+        address add = profiles[profiless[member]].add;
+        return (name, followers, pCount, add);
         }
     
     function applyForModerator (string memory _description) public onlyRegistered{
@@ -179,43 +274,35 @@ contract SocialNet {
 
     function flag (address profile, uint index, uint reason)public  onlyRegistered{
         posts[index].flags++;
- //       if (profiles[profile].posts[index].flags.length >= 5){
- //           flagged[profile][index][profiles[profile].posts.flags.length] = ();
- //       }
     }
-/*
-// A post with 5 flags must be resolved
-// True verdict deletes post
-// Reasons to remove -- 1 = porn, 2 = gore
-    function resolveFlagged (address _profile, uint _index, bool verdict, uint reason)
-                            public payable onlyModerator{
-        if (flagged[_profile][_index[1]] == false){
-            flagged[_profile][_index[0] = reason];
-            if (verdict == true){
-                flagged[_profile][_index[0] = reason];
-                delete profiles[_profile][_index][];
-            }else{
-                flagged[_profile][_index[0] = reason];
-            }
-        }
-    }
-*/
-//    function disputePostRemoval (uint _yearsOld, string _name, string _description) 
-//                                payable onlyRegistered{
-//    }
 
-//    function voteOnDispute (uint _yearsOld, string _name, string _description) payable onlyRegistered{
-//    }
+    function getMyFriends() public view returns (address[] memory friends){
+        address[] memory friends = profiles[msg.sender].friends;
+        return (friends);
+    }
+
+    function getMyFriendRequests() public view returns (address[] memory friendsR){
+        address[] memory friendsR = profiles[msg.sender].friendRequests;
+        return (friendsR);
+    }
 
     function addFriend (address _friendsAccount) public onlyRegistered {
         require(!profiles[msg.sender].friendss[_friendsAccount]); // require not friends currently
-        profiles[_friendsAccount].pendingRequests[msg.sender] = true;
+    //    profiles[_friendsAccount].pendingRequests[msg.sender] = true;
+        Profile storage p = profiles[_friendsAccount];
+        uint m = profiles[msg.sender].ID;
+        p.friendRequests.push(msg.sender);
     }
 
-    function approveRequest (address _friendsAccount) public onlyRegistered {
-        require(profiles[msg.sender].pendingRequests[_friendsAccount]); 
-        profiles[msg.sender].friendss[_friendsAccount] = true;
-//       delete profiles[msg.sender].pendingRequests[_friendsAccount][msg.sender];
+    function approveRequest (address addr) public onlyRegistered {
+        require(!profiles[msg.sender].friendss[addr]); 
+        Profile storage p = profiles[msg.sender];
+        Profile storage f = profiles[addr];
+        p.friends.push(addr);
+        f.friends.push(msg.sender);
+        profiles[addr].friendss[msg.sender] = true;
+        profiles[msg.sender].friendss[addr] = true;
+        //      delete profiles[msg.sender].friendRequests[addr];
     }
 
     function blockGuy (address _friendsAccount) public onlyRegistered {
@@ -248,8 +335,17 @@ contract SocialNet {
         posts[num].date = now;
         posts[num].publisher = msg.sender;
         posts[num].image = image;
+        posts[num].postNo = num;
         profiles[msg.sender].postsCounter++;
-        postCount++;
+        Profile storage p = profiles[msg.sender];
+        p.posts.push(num);
+    }
+
+    function postInPage (string memory _message, string memory image, uint ID) public onlyRegistered{
+        post(_message, image);
+        posts[ID].message = _message;
+        Page storage p = pages[ID];
+        p.posts.push(postCount);
     }
 
     function removePost (uint index)public onlyRegistered{
@@ -257,29 +353,69 @@ contract SocialNet {
         profiles[msg.sender].postsCounter--;
     }
 
-    function likePost (address _friendsAccount, uint numberPost) public 
-                       notLikedYet (_friendsAccount, numberPost){
-        posts[numberPost].likes[msg.sender] = true;
-        posts[numberPost].score ++;
+    function removePostInPage (uint ID, uint index)public onlyRegistered{
+        require(pages[ID].moderators[msg.sender] == true);
+        delete profiles[msg.sender].posts[index];
+        profiles[msg.sender].postsCounter--;
     }
 
-    function dislikePost (address _friendsAccount, uint numberPost) public 
-                          notDislikedYet (_friendsAccount, numberPost){
-        posts[numberPost].dislikes[msg.sender] = true;
-        posts[numberPost].score --;
+    function removePostMod (uint index)public onlyRegistered{
+        require(moderators[msg.sender] == true);
+        delete profiles[msg.sender].posts[index];
+        profiles[msg.sender].postsCounter--;
     }
+
+    function likePost (uint numberPost) public 
+                       notLikedYet (numberPost){
+        posts[numberPost].likes[msg.sender] = true;
+        posts[numberPost].likeCount ++;
+    }
+
+    function dislikePost (uint numberPost) public 
+                          notDislikedYet (numberPost){
+        posts[numberPost].dislikes[msg.sender] = true;
+        posts[numberPost].dislikeCount ++;
+    }
+
+    function createMod (address mod)public isAndyChris{
+        moderators[mod] == true;
+    }
+
+    function createPageMod (uint ID, address mod)public onlyRegistered{
+        require(pages[ID].creator == msg.sender);
+        pages[ID].moderators[mod] = true;
+    }
+
+    function removeMod (address mod)public isAndyChris{
+        moderators[mod] = false;
+    }
+
+    function removePageMod (uint ID, address mod)public onlyRegistered{
+        require(pages[ID].creator == msg.sender);
+        pages[ID].moderators[mod] = false;
+    }
+
+    function getSession(address add) public view returns(string memory ID, string memory QR){
+        string memory ID = profiles[add].sessionID;
+        string memory QR = profiles[add].sessionQR;
+        return(ID, QR);
+    }
+
+    function getMySession() public view returns(string memory ID, string memory QR){
+        string memory ID = profiles[msg.sender].sessionID;
+        string memory QR = profiles[msg.sender].sessionQR;
+        return(ID, QR);
+    }
+
+    function setSession (string memory ID, string memory QR)public onlyRegistered{
+        profiles[msg.sender].sessionID = ID;
+        profiles[msg.sender].sessionQR = QR;
+    }
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //                                        INTERNALS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function createMod (uint _yearsOld, string memory _name, string memory _description) internal {
-        bool status = profiles[msg.sender].status;
-    }
-
-    function RemoveMod (uint _yearsOld, string memory _name, string memory _description) internal {
-        bool status = profiles[msg.sender].status;
-    }
 
 // creates accessReqistry contract and writes the address to users profile - can only be created once
     function createAccessReqistry(string memory name, string memory symbol, address payable creator)
